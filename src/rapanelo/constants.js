@@ -1,0 +1,4 @@
+export const TEXT_ELEMENT = 'TEXT_ELEMENT';
+export const ADD_ELEMENT = 'ADD_ELEMENT';
+export const UPDATE_ELEMENT = 'UPDATE_ELEMENT';
+export const REMOVE_ELEMENT = 'REMOVE_ELEMENT';
