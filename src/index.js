@@ -4,6 +4,8 @@ import {
 	Fragment,
 	useState,
 	useEffect,
+	createStore,
+	useStore,
 } from './rapanelo';
 
 const Title = (props) => <h2>Hello {props.name}!</h2>;
@@ -44,6 +46,26 @@ const ChuckNorrisFacts = () => {
 	);
 };
 
+const ToDoApp = () => {
+	const [todos, dispatch] = useStore(state => state.todos);
+	return (
+		<div>
+			<div>
+			{todos.map((todo) => {
+				return <p>{`#${todo.id} - ${todo.description}`}</p>
+			})}
+			</div>
+			
+			<button onClick={() => dispatch({
+				type: 'ADD_TODO',
+				payload: {
+					description: 'Fake todo'
+				}
+			})}>Add a new todo</button>
+		</div>
+	);
+}
+
 const app = (
 	<div>
 		<Title name="Fabio Rapanelo" />
@@ -55,8 +77,28 @@ const app = (
 			<Counter />
 		</Panel>
 		<ChuckNorrisFacts />
+		<ToDoApp />
 	</div>
 );
 
+const todoReducer = (state, action) => {
+	if (action.type === 'ADD_TODO') {
+		return {
+			...state,
+			todos: [...state.todos, {
+				id: state.todos.length + 1,
+				description: action.payload.description,
+			}],
+		};
+	}
+
+	return state;
+};
+
+const reducers = [
+	todoReducer,
+];
+
+const store = createStore({ todos: [] }, reducers);
 const root = document.querySelector('#root');
-render(app, root);
+render(app, root, store);

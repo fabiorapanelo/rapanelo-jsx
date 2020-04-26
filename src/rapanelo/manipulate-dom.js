@@ -1,10 +1,10 @@
 import { TEXT_ELEMENT } from './constants';
 
-const createDomElement = (fiber) => {
-	if (fiber.type === TEXT_ELEMENT) {
+const createDomElement = (virtualDom) => {
+	if (virtualDom.type === TEXT_ELEMENT) {
 		return document.createTextNode('');
 	}
-	return document.createElement(fiber.type);
+	return document.createElement(virtualDom.type);
 };
 
 const isEvent = (name) => name.startsWith('on');
@@ -36,8 +36,8 @@ export const updateDom = (dom, prevProps, nextProps) => {
 	});
 };
 
-export const createDom = (fiber) => {
-	const dom = createDomElement(fiber);
-	updateDom(dom, {}, fiber.props);
+export const createDom = (virtualDom) => {
+	const dom = createDomElement(virtualDom);
+	updateDom(dom, {}, virtualDom.props);
 	return dom;
 };

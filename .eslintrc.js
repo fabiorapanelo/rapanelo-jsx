@@ -31,5 +31,6 @@ module.exports = {
     "no-plusplus": 0,
     "no-param-reassign": 0,
     "no-trailing-spaces": "error"
+    "import/prefer-default-export": 0,
   },
 };

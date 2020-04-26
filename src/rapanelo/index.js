@@ -8,23 +8,25 @@ let wipRoot = null;
 let nodesToBeDeleted = [];
 let wipVirtualNode = null;
 let hookIndex = null;
+let rapaneloStore = null;
 
-export function render(element, container) {
+export function render(element, container, store) {
+	rapaneloStore = store;
 	wipRoot = {
 		dom: container,
 		props: {
 			children: [element],
 		},
-		alternate: currentRoot,
+		oldVirtualNode: currentRoot,
 	};
 	nextUnitOfWork = wipRoot;
 }
 
 function workLoop(deadline) {
-	let noTimeRemaining = false;
-	while (nextUnitOfWork && !noTimeRemaining) {
+	let timeFinished = false;
+	while (nextUnitOfWork && !timeFinished) {
 		nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
-		noTimeRemaining = deadline.timeRemaining() < 1;
+		timeFinished = deadline.timeRemaining() < 1;
 	}
 
 	if (!nextUnitOfWork && wipRoot) {
@@ -37,8 +39,7 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(virtualNode) {
-	const isFunctionComponent = virtualNode.type instanceof Function;
-	if (isFunctionComponent) {
+	if (typeof virtualNode.type === 'function') {
 		updateFunctionComponent(virtualNode);
 	} else {
 		updateHostComponent(virtualNode);
@@ -74,7 +75,7 @@ function updateHostComponent(virtualNode) {
 function reconcileChildren(virtualNode, children) {
 	children = flattenDeep(children);
 	let index = 0;
-	let oldVirtualNode = virtualNode.alternate && virtualNode.alternate.child;
+	let oldVirtualNode = virtualNode.oldVirtualNode && virtualNode.oldVirtualNode.child;
 	let prevSibling = null;
 
 	while (index < children.length || oldVirtualNode != null) {
@@ -89,7 +90,7 @@ function reconcileChildren(virtualNode, children) {
 				props: element.props,
 				dom: oldVirtualNode.dom,
 				parent: virtualNode,
-				alternate: oldVirtualNode,
+				oldVirtualNode,
 				effectTag: UPDATE_ELEMENT,
 			};
 		}
@@ -99,7 +100,7 @@ function reconcileChildren(virtualNode, children) {
 				props: element.props,
 				dom: null,
 				parent: virtualNode,
-				alternate: null,
+				oldVirtualNode: null,
 				effectTag: ADD_ELEMENT,
 			};
 		}
@@ -144,7 +145,7 @@ function commitWork(virtualNode) {
 	if (virtualNode.effectTag === ADD_ELEMENT && virtualNode.dom != null) {
 		domParent.appendChild(virtualNode.dom);
 	} else if (virtualNode.effectTag === UPDATE_ELEMENT && virtualNode.dom != null) {
-		updateDom(virtualNode.dom, virtualNode.alternate.props, virtualNode.props);
+		updateDom(virtualNode.dom, virtualNode.oldVirtualNode.props, virtualNode.props);
 	} else if (virtualNode.effectTag === REMOVE_ELEMENT) {
 		commitDeletion(virtualNode, domParent);
 	}
@@ -163,9 +164,9 @@ function commitDeletion(virtualNode, domParent) {
 
 function getHookByIndex(index) {
 	return (
-		wipVirtualNode.alternate
-		&& wipVirtualNode.alternate.hooks
-		&& wipVirtualNode.alternate.hooks[index]
+		wipVirtualNode.oldVirtualNode
+		&& wipVirtualNode.oldVirtualNode.hooks
+		&& wipVirtualNode.oldVirtualNode.hooks[index]
 	);
 }
 
@@ -186,7 +187,7 @@ export function useState(initial) {
 		wipRoot = {
 			dom: wipVirtualNode.parent.dom,
 			props: wipVirtualNode.parent.props,
-			alternate: wipVirtualNode.parent,
+			oldVirtualNode: wipVirtualNode.parent,
 		};
 		nextUnitOfWork = wipRoot;
 		nodesToBeDeleted = [];
@@ -210,4 +211,48 @@ export function useEffect(action, args = []) {
 	hookIndex++;
 }
 
+export function useStore(selector) {
+	if (!rapaneloStore) {
+		throw new Error('Store was not created.');
+	}
+	if (typeof selector !== 'function') {
+		throw new Error('useStore needs a function as argument.');
+	}
+
+	const oldHook = getHookByIndex(hookIndex);
+	let hookState;
+	if (oldHook) {
+		hookState = oldHook.state;
+		oldHook.unsubscribe();
+	} else {
+		hookState = selector(rapaneloStore.getState());
+	}
+
+	const hook = {
+		state: hookState,
+	};
+
+	const handler = (state) => {
+		const newHookState = selector(state);
+		if (hook.state !== newHookState) {
+			hook.state = newHookState;
+
+			wipRoot = {
+				dom: wipVirtualNode.parent.dom,
+				props: wipVirtualNode.parent.props,
+				oldVirtualNode: wipVirtualNode.parent,
+			};
+			nextUnitOfWork = wipRoot;
+			nodesToBeDeleted = [];
+		}
+	};
+
+	hook.unsubscribe = rapaneloStore.subscribe(handler);
+	
+	wipVirtualNode.hooks.push(hook);
+	hookIndex++;
+	return [hook.state, rapaneloStore.dispatch];
+}
+
 export { Fragment, createElement } from './create-element';
+export { createStore } from './create-store';
