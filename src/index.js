@@ -4,11 +4,12 @@ import {
 	Fragment,
 	useState,
 	useEffect,
+	useRef,
 	createStore,
 	useStore,
 } from './rapanelo';
 
-const Title = (props) => <h2>Hello {props.name}!</h2>;
+const Title = (props) => <h2 style={{'color': 'red'}}>Hello {props.name}!</h2>;
 
 const Panel = (props) => <div class="panel">{props.children}</div>;
 
@@ -48,20 +49,32 @@ const ChuckNorrisFacts = () => {
 
 const ToDoApp = () => {
 	const [todos, dispatch] = useStore(state => state.todos);
+	const inputRef = useRef();
+
+	const addTodo = () => {
+		const value = inputRef.current.value;
+		if (!value) return;
+
+		inputRef.current.value = "";
+		inputRef.current.focus();
+
+		dispatch({
+			type: 'ADD_TODO',
+			payload: {
+				description: value
+			}
+		});
+	};
+
 	return (
 		<div>
+			<input type="text" ref={inputRef}></input>
+			<button onClick={addTodo}>Add a new todo</button>
 			<div>
-			{todos.map((todo) => {
-				return <p>{`#${todo.id} - ${todo.description}`}</p>
-			})}
+				{todos.map((todo) => {
+					return <p>{`#${todo.id} - ${todo.description}`}</p>
+				})}
 			</div>
-			
-			<button onClick={() => dispatch({
-				type: 'ADD_TODO',
-				payload: {
-					description: 'Fake todo'
-				}
-			})}>Add a new todo</button>
 		</div>
 	);
 }

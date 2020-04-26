@@ -20,6 +20,7 @@ export function render(element, container, store) {
 		oldVirtualNode: currentRoot,
 	};
 	nextUnitOfWork = wipRoot;
+	rapaneloStore && rapaneloStore.subscribe(storeUpdatedHandler)
 }
 
 function workLoop(deadline) {
@@ -211,6 +212,16 @@ export function useEffect(action, args = []) {
 	hookIndex++;
 }
 
+const storeUpdatedHandler = () => {
+	wipRoot = {
+		dom: currentRoot.dom,
+		props: currentRoot.props,
+		oldVirtualNode: currentRoot,
+	};
+	nextUnitOfWork = wipRoot;
+	nodesToBeDeleted = [];
+};
+
 export function useStore(selector) {
 	if (!rapaneloStore) {
 		throw new Error('Store was not created.');
@@ -219,39 +230,18 @@ export function useStore(selector) {
 		throw new Error('useStore needs a function as argument.');
 	}
 
+	const selectedState = selector(rapaneloStore.getState());
+
+	return [selectedState, rapaneloStore.dispatch];
+}
+
+export function useRef() {
 	const oldHook = getHookByIndex(hookIndex);
-	let hookState;
-	if (oldHook) {
-		hookState = oldHook.state;
-		oldHook.unsubscribe();
-	} else {
-		hookState = selector(rapaneloStore.getState());
-	}
+	const hook = oldHook ? oldHook : { current: null };
 
-	const hook = {
-		state: hookState,
-	};
-
-	const handler = (state) => {
-		const newHookState = selector(state);
-		if (hook.state !== newHookState) {
-			hook.state = newHookState;
-
-			wipRoot = {
-				dom: wipVirtualNode.parent.dom,
-				props: wipVirtualNode.parent.props,
-				oldVirtualNode: wipVirtualNode.parent,
-			};
-			nextUnitOfWork = wipRoot;
-			nodesToBeDeleted = [];
-		}
-	};
-
-	hook.unsubscribe = rapaneloStore.subscribe(handler);
-	
 	wipVirtualNode.hooks.push(hook);
 	hookIndex++;
-	return [hook.state, rapaneloStore.dispatch];
+	return hook;
 }
 
 export { Fragment, createElement } from './create-element';

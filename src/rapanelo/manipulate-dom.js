@@ -7,15 +7,23 @@ const createDomElement = (virtualDom) => {
 	return document.createElement(virtualDom.type);
 };
 
+export const createDom = (virtualDom) => {
+	const dom = createDomElement(virtualDom);
+	updateDom(dom, {}, virtualDom.props);
+	return dom;
+};
+
 const isEvent = (name) => name.startsWith('on');
-const getEventName = (name) => name.toLowerCase().substring(2);
+const isObject = (value) => typeof value === 'object';
 
 export const updateDom = (dom, prevProps, nextProps) => {
 	Object.entries(prevProps).forEach(([name, value]) => {
 		if (!nextProps.hasOwnProperty(name)) {
 			if (isEvent(name)) {
-				dom.removeEventListener(getEventName(name), value);
-			} else if (name !== 'children') {
+				updateEvent(dom, name, value, undefined);
+			} else if (name === 'style') {
+				updateStyle(dom, value, undefined);
+			} else if (name !== 'children' && name !== 'ref') {
 				delete dom[name];
 			}
 		}
@@ -25,10 +33,13 @@ export const updateDom = (dom, prevProps, nextProps) => {
 		const previousValue = prevProps[name];
 		if (previousValue !== value) {
 			if (isEvent(name)) {
-				if (previousValue) {
-					dom.removeEventListener(getEventName(name), previousValue);
+				updateEvent(dom, name, previousValue, value);
+			} else if (name === 'style') {
+				updateStyle(dom, previousValue, value);
+			} else if (name === 'ref') {
+				if (isObject(value)) {
+					value.current = dom;
 				}
-				dom.addEventListener(getEventName(name), value);
 			} else if (name !== 'children') {
 				dom[name] = value;
 			}
@@ -36,8 +47,25 @@ export const updateDom = (dom, prevProps, nextProps) => {
 	});
 };
 
-export const createDom = (virtualDom) => {
-	const dom = createDomElement(virtualDom);
-	updateDom(dom, {}, virtualDom.props);
-	return dom;
-};
+const getEventName = (name) => name.toLowerCase().substring(2);
+
+const updateEvent = (dom, name, previousValue, value) => {
+	const eventName = getEventName(name);
+	if (previousValue) {
+		dom.removeEventListener(eventName, previousValue);
+	}
+	if (value) {
+		dom.addEventListener(eventName, value);
+	}
+}
+
+const updateStyle = (dom, previousValue, value) => {
+	if (isObject(previousValue)) {
+		Object.entries(previousValue).forEach(([cssProperty]) => {
+			delete dom.style[cssProperty];
+		});
+	}
+	if (isObject(value)) {
+		Object.assign(dom.style, value);
+	}
+}
