@@ -7,16 +7,6 @@
           "esmodules": true
         }
       }
-    ],
-    [
-      "@babel/preset-react",
-      {
-        "pragma": "createElement", // default pragma is React.createElement (only in classic runtime)
-        "pragmaFrag": "Fragment", // default is React.Fragment (only in classic runtime)
-        "throwIfNamespace": true, // defaults to true
-        "runtime": "classic", // "classic" or "automatic", defaults to classic
-        "importSource": "./src/rapanelo/index" // defaults to react (only in automatic runtime)
-      }
     ]
   ]
 }

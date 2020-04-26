@@ -1,7 +1,12 @@
-const HtmlWebPackPlugin = require('html-webpack-plugin');
+const path = require('path');
 
 module.exports = {
-	devtool: 'eval-source-map',
+	mode: 'production',
+	entry: './src/index.js',
+	output: {
+		path: path.resolve('dist'),
+		filename: 'rapanelo-jsx.js',
+	},
 	module: {
 		rules: [
 			{
@@ -10,21 +15,10 @@ module.exports = {
 				use: {
 					loader: 'babel-loader',
 				},
-			},
-			{
-				test: /\.html$/,
-				use: [
-					{
-						loader: 'html-loader',
-					},
-				],
-			},
+			}
 		],
 	},
-	plugins: [
-		new HtmlWebPackPlugin({
-			template: './src/index.html',
-			filename: './index.html',
-		}),
-	],
+	resolve: {
+		extensions: ['.js'],
+	},
 };

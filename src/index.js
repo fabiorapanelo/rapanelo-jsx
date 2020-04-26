@@ -1,117 +1,247 @@
-import {
-	render,
-	createElement,
-	Fragment,
-	useState,
-	useEffect,
-	useRef,
-	createStore,
-	useStore,
-} from './rapanelo';
+import { createDom, updateDom } from './manipulate-dom';
+import { flattenDeep, argsChanged } from './utils';
+import { ADD_ELEMENT, UPDATE_ELEMENT, REMOVE_ELEMENT } from './constants';
+export { Fragment, createElement } from './create-element';
+export { createStore } from './create-store';
 
-const Title = (props) => <h2 style={{'color': 'red'}}>Hello {props.name}!</h2>;
+let nextUnitOfWork = null;
+let currentRoot = null;
+let wipRoot = null;
+let nodesToBeDeleted = [];
+let wipVirtualNode = null;
+let hookIndex = null;
+let rapaneloStore = null;
 
-const Panel = (props) => <div class="panel">{props.children}</div>;
-
-const UseFragment = () => (
-	<Fragment>
-		<p>Lorem ipsum 3</p>
-		<p>Lorem ipsum 4</p>
-	</Fragment>
-);
-
-const Counter = () => {
-	const [value, setValue] = useState(0);
-	useEffect(() => {
-		document.title = `You clicked ${value} times`;
-	}, [value]);
-	return (
-		<div>
-			<span>{`Clicked ${value} times`}</span>
-			<button onClick={() => setValue((v) => v + 1)}>Increment</button>
-		</div>
-	);
-};
-
-const ChuckNorrisFacts = () => {
-	const [facts, setFacts] = useState([]);
-	useEffect(async () => {
-		const response = await fetch('http://api.icndb.com/jokes/random/10');
-		const data = await response.json();
-		setFacts(() => data.value);
-	}, []);
-	return (
-		<div>
-			{facts.map((fact) => <p>{`#${fact.id} - ${fact.joke}`}</p>)}
-		</div>
-	);
-};
-
-const ToDoApp = () => {
-	const [todos, dispatch] = useStore(state => state.todos);
-	const inputRef = useRef();
-
-	const addTodo = () => {
-		const value = inputRef.current.value;
-		if (!value) return;
-
-		inputRef.current.value = "";
-		inputRef.current.focus();
-
-		dispatch({
-			type: 'ADD_TODO',
-			payload: {
-				description: value
-			}
-		});
+export function render(element, container, store) {
+	rapaneloStore = store;
+	wipRoot = {
+		dom: container,
+		props: {
+			children: [element],
+		},
+		oldVirtualNode: currentRoot,
 	};
+	nextUnitOfWork = wipRoot;
+	rapaneloStore && rapaneloStore.subscribe(storeUpdatedHandler)
+}
 
+function workLoop(deadline) {
+	let timeFinished = false;
+	while (nextUnitOfWork && !timeFinished) {
+		nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+		timeFinished = deadline.timeRemaining() < 1;
+	}
+
+	if (!nextUnitOfWork && wipRoot) {
+		commitRoot();
+	}
+
+	requestIdleCallback(workLoop);
+}
+
+requestIdleCallback(workLoop);
+
+function performUnitOfWork(virtualNode) {
+	if (typeof virtualNode.type === 'function') {
+		updateFunctionComponent(virtualNode);
+	} else {
+		updateHostComponent(virtualNode);
+	}
+	if (virtualNode.child) {
+		return virtualNode.child;
+	}
+	let nextVirtualNode = virtualNode;
+	while (nextVirtualNode) {
+		if (nextVirtualNode.sibling) {
+			return nextVirtualNode.sibling;
+		}
+		nextVirtualNode = nextVirtualNode.parent;
+	}
+	return undefined;
+}
+
+function updateFunctionComponent(virtualNode) {
+	wipVirtualNode = virtualNode;
+	hookIndex = 0;
+	wipVirtualNode.hooks = [];
+	const children = [virtualNode.type(virtualNode.props)];
+	reconcileChildren(virtualNode, children);
+}
+
+function updateHostComponent(virtualNode) {
+	if (!virtualNode.dom) {
+		virtualNode.dom = createDom(virtualNode);
+	}
+	reconcileChildren(virtualNode, virtualNode.props.children);
+}
+
+function reconcileChildren(virtualNode, children) {
+	children = flattenDeep(children);
+	let index = 0;
+	let oldVirtualNode = virtualNode.oldVirtualNode && virtualNode.oldVirtualNode.child;
+	let prevSibling = null;
+
+	while (index < children.length || oldVirtualNode != null) {
+		const element = children[index];
+		let newVirtualNode = null;
+
+		const sameType = oldVirtualNode && element && element.type === oldVirtualNode.type;
+
+		if (sameType) {
+			newVirtualNode = {
+				type: oldVirtualNode.type,
+				props: element.props,
+				dom: oldVirtualNode.dom,
+				parent: virtualNode,
+				oldVirtualNode,
+				effectTag: UPDATE_ELEMENT,
+			};
+		}
+		if (element && !sameType) {
+			newVirtualNode = {
+				type: element.type,
+				props: element.props,
+				dom: null,
+				parent: virtualNode,
+				oldVirtualNode: null,
+				effectTag: ADD_ELEMENT,
+			};
+		}
+		if (oldVirtualNode && !sameType) {
+			oldVirtualNode.effectTag = REMOVE_ELEMENT;
+			nodesToBeDeleted.push(oldVirtualNode);
+		}
+
+		if (oldVirtualNode) {
+			oldVirtualNode = oldVirtualNode.sibling;
+		}
+
+		if (index === 0) {
+			virtualNode.child = newVirtualNode;
+		} else if (element) {
+			prevSibling.sibling = newVirtualNode;
+		}
+
+		prevSibling = newVirtualNode;
+		index++;
+	}
+}
+
+function commitRoot() {
+	nodesToBeDeleted.forEach(commitWork);
+	commitWork(wipRoot.child);
+	currentRoot = wipRoot;
+	wipRoot = null;
+}
+
+function commitWork(virtualNode) {
+	if (!virtualNode) {
+		return;
+	}
+
+	let domParentVirtualNode = virtualNode.parent;
+	while (!domParentVirtualNode.dom) {
+		domParentVirtualNode = domParentVirtualNode.parent;
+	}
+	const domParent = domParentVirtualNode.dom;
+
+	if (virtualNode.effectTag === ADD_ELEMENT && virtualNode.dom != null) {
+		domParent.appendChild(virtualNode.dom);
+	} else if (virtualNode.effectTag === UPDATE_ELEMENT && virtualNode.dom != null) {
+		updateDom(virtualNode.dom, virtualNode.oldVirtualNode.props, virtualNode.props);
+	} else if (virtualNode.effectTag === REMOVE_ELEMENT) {
+		commitDeletion(virtualNode, domParent);
+	}
+
+	commitWork(virtualNode.child);
+	commitWork(virtualNode.sibling);
+}
+
+function commitDeletion(virtualNode, domParent) {
+	if (virtualNode.dom) {
+		domParent.removeChild(virtualNode.dom);
+	} else {
+		commitDeletion(virtualNode.child, domParent);
+	}
+}
+
+function getHookByIndex(index) {
 	return (
-		<div>
-			<input type="text" ref={inputRef}></input>
-			<button onClick={addTodo}>Add a new todo</button>
-			<div>
-				{todos.map((todo) => {
-					return <p>{`#${todo.id} - ${todo.description}`}</p>
-				})}
-			</div>
-		</div>
+		wipVirtualNode.oldVirtualNode
+		&& wipVirtualNode.oldVirtualNode.hooks
+		&& wipVirtualNode.oldVirtualNode.hooks[index]
 	);
 }
 
-const app = (
-	<div>
-		<Title name="Fabio Rapanelo" />
-		<Panel>
-			<p>Lorem ipsum</p>
-			<p>Lorem ipsum 2</p>
-			<UseFragment />
-			<Counter />
-			<Counter />
-		</Panel>
-		<ChuckNorrisFacts />
-		<ToDoApp />
-	</div>
-);
+export function useState(initial) {
+	const oldHook = getHookByIndex(hookIndex);
+	const hook = {
+		state: oldHook ? oldHook.state : initial,
+		queue: [],
+	};
 
-const todoReducer = (state, action) => {
-	if (action.type === 'ADD_TODO') {
-		return {
-			...state,
-			todos: [...state.todos, {
-				id: state.todos.length + 1,
-				description: action.payload.description,
-			}],
+	const actions = oldHook ? oldHook.queue : [];
+	actions.forEach((action) => {
+		hook.state = action(hook.state);
+	});
+
+	const setState = (action) => {
+		hook.queue.push(action);
+		wipRoot = {
+			dom: wipVirtualNode.parent.dom,
+			props: wipVirtualNode.parent.props,
+			oldVirtualNode: wipVirtualNode.parent,
 		};
+		nextUnitOfWork = wipRoot;
+		nodesToBeDeleted = [];
+	};
+
+	wipVirtualNode.hooks.push(hook);
+	hookIndex++;
+	return [hook.state, setState];
+}
+
+export function useEffect(action, args = []) {
+	const oldHook = getHookByIndex(hookIndex);
+
+	if (!oldHook || argsChanged(oldHook.args, args)) {
+		action(args);
 	}
 
-	return state;
+	wipVirtualNode.hooks.push({
+		args,
+	});
+	hookIndex++;
+}
+
+const storeUpdatedHandler = () => {
+	wipRoot = {
+		dom: currentRoot.dom,
+		props: currentRoot.props,
+		oldVirtualNode: currentRoot,
+	};
+	nextUnitOfWork = wipRoot;
+	nodesToBeDeleted = [];
 };
 
-const reducers = [
-	todoReducer,
-];
+export function useStore(selector) {
+	if (!rapaneloStore) {
+		throw new Error('Store was not created.');
+	}
+	if (typeof selector !== 'function') {
+		throw new Error('useStore needs a function as argument.');
+	}
 
-const store = createStore({ todos: [] }, reducers);
-const root = document.querySelector('#root');
-render(app, root, store);
+	const selectedState = selector(rapaneloStore.getState());
+
+	return [selectedState, rapaneloStore.dispatch];
+}
+
+export function useRef() {
+	const oldHook = getHookByIndex(hookIndex);
+	const hook = oldHook ? oldHook : { current: null };
+
+	wipVirtualNode.hooks.push(hook);
+	hookIndex++;
+	return hook;
+}

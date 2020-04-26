@@ -1,16 +1,20 @@
 {
-  "name": "custom-render",
-  "version": "1.0.0",
-  "description": "",
-  "main": "webpack.config.js",
+  "name": "rapanelo-jsx",
+  "version": "0.0.1",
+  "description": "JSX render with hooks",
+  "author": {
+    "name": "Fabio Rapanelo",
+    "email": "fabiorapanelo@gmail.com",
+    "url": "https://github.com/fabiorapanelo"
+  },
+  "repository": "github:fabiorapanelo/rapanelo-jsx",
+  "license": "MIT",
+  "main": "dist/rapanelo-jsx.js",
   "scripts": {
-    "start": "webpack-dev-server --open --hot --mode development",
     "build": "webpack --mode production",
     "lint": "eslint .",
     "lint:fix": "eslint --fix --ext .js,.jsx ."
   },
-  "author": "Fabio Rapanelo",
-  "license": "ISC",
   "devDependencies": {
     "@babel/core": "^7.9.0",
     "@babel/preset-env": "^7.9.5",
@@ -19,9 +23,6 @@
     "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.2",
-    "eslint-plugin-local": "^1.0.0",
-    "html-loader": "^1.1.0",
-    "html-webpack-plugin": "^4.2.0",
     "webpack": "^4.42.1",
     "webpack-cli": "^3.3.11",
     "webpack-dev-server": "^3.10.3"
