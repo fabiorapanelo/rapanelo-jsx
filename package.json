@@ -1,6 +1,6 @@
 {
   "name": "rapanelo-jsx",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "JSX render with hooks",
   "author": {
     "name": "Fabio Rapanelo",
@@ -15,6 +15,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix --ext .js,.jsx ."
   },
+  "files": [
+    "src",
+    "dist"
+  ],
   "devDependencies": {
     "@babel/core": "^7.9.0",
     "@babel/preset-env": "^7.9.5",
