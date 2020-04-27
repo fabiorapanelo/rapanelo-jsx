@@ -1,22 +1,22 @@
 import { TEXT_ELEMENT } from './constants';
+import { isObject } from './utils';
 
-const createDomElement = (virtualDom) => {
+function createDomElement(virtualDom) {
 	if (virtualDom.type === TEXT_ELEMENT) {
 		return document.createTextNode('');
 	}
 	return document.createElement(virtualDom.type);
-};
+}
 
-export const createDom = (virtualDom) => {
+export function createDom(virtualDom) {
 	const dom = createDomElement(virtualDom);
 	updateDom(dom, {}, virtualDom.props);
 	return dom;
-};
+}
 
 const isEvent = (name) => name.startsWith('on');
-const isObject = (value) => typeof value === 'object';
 
-export const updateDom = (dom, prevProps, nextProps) => {
+export function updateDom(dom, prevProps, nextProps) {
 	Object.entries(prevProps).forEach(([name, value]) => {
 		if (!nextProps.hasOwnProperty(name)) {
 			if (isEvent(name)) {
@@ -45,11 +45,11 @@ export const updateDom = (dom, prevProps, nextProps) => {
 			}
 		}
 	});
-};
+}
 
 const getEventName = (name) => name.toLowerCase().substring(2);
 
-const updateEvent = (dom, name, previousValue, value) => {
+function updateEvent(dom, name, previousValue, value) {
 	const eventName = getEventName(name);
 	if (previousValue) {
 		dom.removeEventListener(eventName, previousValue);
@@ -59,7 +59,7 @@ const updateEvent = (dom, name, previousValue, value) => {
 	}
 }
 
-const updateStyle = (dom, previousValue, value) => {
+function updateStyle(dom, previousValue, value) {
 	if (isObject(previousValue)) {
 		Object.entries(previousValue).forEach(([cssProperty]) => {
 			delete dom.style[cssProperty];

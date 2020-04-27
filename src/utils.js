@@ -8,3 +8,5 @@ export const argsChanged = (oldArgs, newArgs) => {
 	}
 	return oldArgs.some((oldArg, i) => oldArg !== newArgs[i]);
 };
+
+export const isObject = (value) => typeof value === 'object';
