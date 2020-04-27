@@ -12,7 +12,7 @@ npm i @babel/core babel-loader @babel/preset-env @babel/preset-react --save-dev
 
 Create a .babelrc file with the following content:
 
-```json
+```js
 {
   "presets": [
     [
